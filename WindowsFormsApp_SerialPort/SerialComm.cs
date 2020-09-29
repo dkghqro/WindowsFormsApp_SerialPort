@@ -1,24 +1,27 @@
-﻿using System;
+﻿using DevExpress.Utils.Svg;
+using System;
+using System.CodeDom;
 using System.Diagnostics;
 using System.IO.Ports;
 using System.Text;
 using System.Threading;
+using WindowsFormsApp_SerialPort;
 
 namespace SerialCommLib
 {
     public class SerialComm
     {
-        public delegate void DataReceivedHandlerFunc(string deviceID, byte[] receiveData);
-        public DataReceivedHandlerFunc DataReceivedHandler;
+        public delegate void SerialCommDataReceivedHandler(object sender, SerialCommDataReceivedEventArgs e);
+        public event SerialCommDataReceivedHandler DataReceived;
 
-        public delegate void DisconnectedHandlerFunc(string deviceID);
-        public DisconnectedHandlerFunc DisconnectedHandler;
+        public delegate void DisconnectedHandler(object sender,  SerialCommDisconnectedEventArgs e);
+        public event DisconnectedHandler Disconnected;
 
         public SerialPort serialPort;
-        public int sleepTimeRecv = 100;
-        public int sleepTimeCheck = 200;
-        public string deviceID = "";
-
+        private int sleepTimeRecv = 100;
+        private int sleepTimeCheck = 200;
+        private string _deviceID = "";
+        
         public bool IsOpen
         {
             get
@@ -35,22 +38,32 @@ namespace SerialCommLib
         public SerialComm()
         {
         }
+        public SerialComm(string deviceID)
+        {
+            _deviceID = deviceID;
+        }
+        public string OpenComm(string portName)
+        {
+            return this.OpenComm(portName, 9600, 8, StopBits.One, Parity.None, Handshake.None);
+        }
 
         public string OpenComm(string portName, int baudrate, int databits, StopBits stopbits, Parity parity, Handshake handshake)
         {
             try
             {
-                serialPort = new SerialPort();
-                serialPort.PortName = portName;
-                serialPort.BaudRate = baudrate;
-                serialPort.DataBits = databits;
-                serialPort.StopBits = stopbits;
-                serialPort.Parity = parity;
-                serialPort.Handshake = handshake;
+                serialPort = new SerialPort
+                {
+                    PortName = portName,
+                    BaudRate = baudrate,
+                    DataBits = databits,
+                    StopBits = stopbits,
+                    Parity = parity,
+                    Handshake = handshake,
 
-                // 디바이스에 설정에 따라 분기
-                serialPort.Encoding = new System.Text.ASCIIEncoding();
-                serialPort.NewLine = "\r\n";
+                    // 디바이스에 설정에 따라 분기
+                    Encoding = new System.Text.ASCIIEncoding(),
+                    NewLine = "\r\n"
+                };
                 serialPort.NewLine = Environment.NewLine;
                 serialPort.ErrorReceived += serialPort_ErrorReceived;
                 serialPort.DataReceived += serialPort_DataReceived;
@@ -177,9 +190,8 @@ namespace SerialCommLib
                 Thread.Sleep(sleepTimeRecv);
 
                 byte[] bytesBuffer = ReadSerialByteData();
-                DataReceivedHandler?.Invoke(deviceID, bytesBuffer);
-
                 string strBuffer = Encoding.ASCII.GetString(bytesBuffer);
+                DataReceived?.Invoke(this, new SerialCommDataReceivedEventArgs {DeviceID = _deviceID, ReceivedByteData = bytesBuffer, ReceivedStringData = strBuffer });
                 Debug.WriteLine("received(" + strBuffer.Length + ") : " + strBuffer);
             }
             catch (Exception ex)
@@ -222,9 +234,7 @@ namespace SerialCommLib
                     if (serialPort == null || !serialPort.IsOpen)
                     {
                         Debug.WriteLine("seriaport disconnected");
-
-                        DisconnectedHandler?.Invoke(deviceID);
-
+                        Disconnected?.Invoke(this, new SerialCommDisconnectedEventArgs { DeviceID = _deviceID });
                         break;
                     }
                 }

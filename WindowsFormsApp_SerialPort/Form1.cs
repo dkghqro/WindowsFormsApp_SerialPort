@@ -28,39 +28,19 @@ namespace WindowsFormsApp_SerialPort
             #endregion 단일 포트 테스트
         }
 
-        private void DataReceivedHandler_SerialComm(string deviceID, byte[] recvData)
+        private void Scan_DataReceived(object sender, SerialCommDataReceivedEventArgs e)
         {
             //Console.WriteLine(recvData);
 
             this.Invoke((MethodInvoker)delegate
-            {
-                string recvDataStr = Encoding.ASCII.GetString(recvData);
-
-                switch (deviceID)
+            {                
+                switch (e.DeviceID)
                 {
                     case "SCAN1":
                     case "SCAN2":
-                        richTextBox1.AppendText("[" + deviceID + "]" + recvDataStr);
+                        richTextBox1.AppendText("[" + e.DeviceID + "]" + e.ReceivedStringData);
                         richTextBox1.Focus();
 
-                        break;
-                };
-
-            });
-        }
-
-        private void DisconnectedHandler_SerialComm(string deviceID)
-        {
-            //Console.WriteLine("serial disconnected");
-
-            this.Invoke((MethodInvoker)delegate
-            {
-                switch (deviceID)
-                {
-                    case "SCAN1":
-                    case "SCAN2":
-                        richTextBox1.AppendText("serial disconnected(" + scan1.serialPort.PortName + ")\r\n");
-                        richTextBox1.Focus();
                         break;
                 };
 
@@ -69,6 +49,8 @@ namespace WindowsFormsApp_SerialPort
 
         private void button1_Click(object sender, EventArgs e)
         {
+            
+
             #region 단일 포트 테스트
 
             //var portName = comboBox1.Text;
@@ -92,41 +74,56 @@ namespace WindowsFormsApp_SerialPort
 
             #region 다중 포트 테스트
 
-            scan1 = new SerialComm();
-            scan1.deviceID = "SCAN1";
-            scan1.sleepTimeRecv = 100;
-            scan1.DataReceivedHandler = DataReceivedHandler_SerialComm;
-            scan1.DisconnectedHandler = DisconnectedHandler_SerialComm;
+
+            scan1 = new SerialComm("SCAN1");
+            scan1.DataReceived += Scan_DataReceived;
+            scan1.Disconnected += Scan_Disconnected;
 
             if (scan1.IsOpen) scan1.CloseComm();
 
-            var resultMsg1 = scan1.OpenComm("COM2", 9600, 8, StopBits.One, Parity.None, Handshake.None);
+            var resultMsg1 = scan1.OpenComm("COM2");
             richTextBox1.AppendText(resultMsg1);
 
-            scan2 = new SerialComm();
-            scan2.deviceID = "SCAN2";
-            scan2.sleepTimeRecv = 100;
-            scan2.DataReceivedHandler = DataReceivedHandler_SerialComm;
-            scan2.DisconnectedHandler = DisconnectedHandler_SerialComm;
+
+
+            scan2 = new SerialComm("SCAN2");
+            scan2.DataReceived += Scan_DataReceived;
+            scan2.Disconnected += Scan_Disconnected;
 
             if (scan2.IsOpen) scan2.CloseComm();
 
-            var resultMsg2 = scan2.OpenComm("COM3", 9600, 8, StopBits.One, Parity.None, Handshake.None);
+            var resultMsg2 = scan2.OpenComm("COM3");
             richTextBox1.AppendText(resultMsg2);
 
             #endregion 다중 포트 테스트
 
         }
 
+        private void Scan_Disconnected(object sender, SerialCommDisconnectedEventArgs e)
+        {
+            this.Invoke((MethodInvoker)delegate
+            {
+                switch (e.DeviceID)
+                {
+                    case "SCAN1":
+                    case "SCAN2":
+                        richTextBox1.AppendText("serial disconnected(" + scan1.serialPort.PortName + ")\r\n");
+                        richTextBox1.Focus();
+                        break;
+                };
+
+            });
+        }
+
         private void button2_Click(object sender, EventArgs e)
         {
-            if (scan1.IsOpen)
+            if (scan1?.IsOpen == true)
             {
                 var resultMsg1 = scan1.CloseComm();
                 richTextBox1.AppendText(resultMsg1);
             }
 
-            if (scan2.IsOpen)
+            if (scan2?.IsOpen == true)
             {
                 var resultMsg1 = scan2.CloseComm();
                 richTextBox1.AppendText(resultMsg1);
